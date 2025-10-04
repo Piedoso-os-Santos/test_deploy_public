@@ -1,36 +1,43 @@
-# This is a basic workflow to help you get started with Actions
+name: Deploy (cPanel)
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "main" ]   # ajusta a tua branch
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  deploy:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    timeout-minutes: 30
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # (Opcional) Build do teu projecto: ajusta conforme stack
+      - name: Build (opcional)
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          if [ -f package.json ]; then npm ci && npm run build; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt --target ./python_packages; fi
+          # adiciona outros passos de build/empacotamento conforme necessário
+
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          #local-dir: ./   # termina com /
+          server-dir: ../   # termina com /
+          # server-dir: /public_htmlx/   # termina com /
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/tests/**
+            **/.vscode/**
+          # dry-run: true   # ativa para testar sem enviar
